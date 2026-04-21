@@ -18,7 +18,7 @@ class VerificationController extends Controller
 {
     function index(Request $request): Response
     {                       
-        $ageCheck = 16;
+        $ageCheck = 14;
 
         $userName = Str::uuid();
 
@@ -49,13 +49,16 @@ class VerificationController extends Controller
         $backgroundColor = new Rgb(255, 255, 255);
 
         $fill = Fill::uniformColor($foregroundColor, $backgroundColor);
+
+        $nonce = Str::random(32);
         
         $dataArray = [
-            "vurl" => "https://verify.siehog.com/api/verification/tester",
-            "mina" => $ageCheck,
-            "user" => $user
+            "vurl"  => env('PROVIDER_UUID'),
+            "mina"  => $ageCheck,
+            "user"  => $user,
+            "nonce" => $nonce
         ];
-        
+                
         $data = json_encode($dataArray);
                             
         $renderer = new ImageRenderer(new RendererStyle(420, 1, null, null, $fill), new ImagickImageBackEnd());
@@ -64,21 +67,17 @@ class VerificationController extends Controller
                                     
         return $qrcode;
     }
-    
-    // The vurl accepts the response from the validator, the validator will post the result after verification
 
     public function tester(Request $request): JsonResponse
     {
-        $userId = $request->input('userid');
         $issuer = $request->input('issuer');
-        $status = $request->input('status');
-
-        file_put_contents('/tmp/' . trim($userId), $issuer . ':' . $status);
+        $creds  = $request->input('creds');
+        $user   = $request->input('user');
+        
+        file_put_contents('/tmp/' . trim($user), $issuer . ':' . $creds);
 
         return response()->json([]);
     }
-
-    // The demo uses polling to check, if we received a message from the validator
 
     public function checker(Request $request): JsonResponse
     {
@@ -92,19 +91,38 @@ class VerificationController extends Controller
 
         // true oder false
 
-        $ageCheck = (int) $request->input('age', 0);
-
         if (preg_match('/^[^:]+:(.+)$/', trim($content), $matches)) {
 
             unlink($file);
 
-            $display = trim($matches[1]);
-            
-            $result = 'false';
+            $datas = base64_decode(trim($matches[1]));
 
-            if (str_contains($display, "true")) {
-                $result = 'true';
-                $request->session()?->put('age_verified', true);                
+            try {            
+                $creds = json_decode($datas, true);
+
+                if (array_key_exists('proof', $creds) && array_key_exists('field', $creds)) {
+                    $proof = $creds['proof'];
+
+                    // proof->publickey, proof->signature, add check signature here, content = creds['field']
+
+                    $datas = base64_decode($creds['field']);
+
+                    $field = json_decode($datas, true);
+                
+                    if (array_key_exists('show', $field)) {            
+                        $display = $field['show'];
+            
+                        $result = 'false';
+
+                        if (str_contains($display, "true")) {
+                            $result = 'true';
+                            $request->session()?->put('age_verified', true);                
+                        }
+                    }
+                }
+
+            } catch (Exception $e) {
+
             }
 
             return response()->json(['ready' => true, 'result' => $result]);
