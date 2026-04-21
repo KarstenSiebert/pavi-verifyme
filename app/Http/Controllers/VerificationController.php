@@ -9,6 +9,7 @@ use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use BaconQrCode\Renderer\Color\Rgb;
+use Illuminate\Support\Facades\Hash;
 use BaconQrCode\Renderer\ImageRenderer;
 use BaconQrCode\Renderer\RendererStyle\Fill;
 use BaconQrCode\Renderer\Image\ImagickImageBackEnd;
@@ -51,14 +52,18 @@ class VerificationController extends Controller
         $fill = Fill::uniformColor($foregroundColor, $backgroundColor);
 
         $nonce = Str::random(32);
+
+        $vurl = env('PROVIDER_UUID');
+        $code = Hash::make(base64_encode($vurl.$user.$ageCheck.$nonce));
         
         $dataArray = [
-            "vurl"  => env('PROVIDER_UUID'),
+            "vurl"  => $vurl,
             "mina"  => $ageCheck,
             "user"  => $user,
+            "code"  => $code,
             "nonce" => $nonce
         ];
-                
+
         $data = json_encode($dataArray);
                             
         $renderer = new ImageRenderer(new RendererStyle(420, 1, null, null, $fill), new ImagickImageBackEnd());
