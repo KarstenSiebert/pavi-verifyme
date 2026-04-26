@@ -6,8 +6,7 @@ import AppGuestLayout from '@/layouts/AppGuestLayout.vue'
 
 interface VerifyPageProps {
     ageCheck: number
-    imageQRC: string
-    userName: string
+    codeName: string
     errors?: any
     name?: string
     auth?: any
@@ -21,7 +20,7 @@ const ageCheck = page.props.ageCheck
 
 const qrcImage = page.props.qrcImage
 
-const userName = page.props.userName
+const codeName = page.props.codeName
 
 const status = ref('waiting')
 let interval: number
@@ -42,7 +41,7 @@ onMounted(() => {
 
         try {
             const res = await axios.get('/api/verification/checker', {
-                params: { age: ageCheck, user: userName.trim() }
+                params: { age: ageCheck, code: codeName.trim() }
             })
 
             if (res.data.ready) {

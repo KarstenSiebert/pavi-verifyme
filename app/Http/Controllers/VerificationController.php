@@ -19,17 +19,21 @@ class VerificationController extends Controller
 {
     function index(Request $request): Response
     {                       
-        $ageCheck = 14;
+        $ageCheck = 15;
 
-        $userName = Str::uuid();
+        $vurl = env('PROVIDER_UUID');
 
-        $qrcImage = $this->qrImage($userName, $ageCheck);
+        $nonce = Str::random(16);
+        
+        $codeName = Hash::make(base64_encode($vurl.$ageCheck.$nonce));
+
+        $qrcImage = $this->qrImage($codeName, $ageCheck, $vurl, $nonce);
     
         return Inertia::render('Verify', 
                     [
                         'ageCheck' => $ageCheck,
                         'qrcImage' => $qrcImage,
-                        'userName' => $userName
+                        'codeName' => $codeName
                     ]);
     }
 
@@ -43,7 +47,7 @@ class VerificationController extends Controller
         ]);
     }
 
-    public function qrImage(string $user, string $ageCheck): string
+    public function qrImage(string $code, string $ageCheck, string $vurl, string $nonce): string
     {        
         $foregroundColor = new Rgb(50, 50, 50);
 
@@ -51,17 +55,11 @@ class VerificationController extends Controller
 
         $fill = Fill::uniformColor($foregroundColor, $backgroundColor);
 
-        $nonce = Str::random(32);
-
-        $vurl = env('PROVIDER_UUID');
-        $code = Hash::make(base64_encode($vurl.$user.$ageCheck.$nonce));
-        
         $dataArray = [
-            "vurl"  => $vurl,
-            "mina"  => $ageCheck,
-            "user"  => $user,
-            "code"  => $code,
-            "nonce" => $nonce
+            "vurl"    => $vurl,
+            "min_age" => $ageCheck,            
+            "code"    => $code,
+            "nonce"   => $nonce
         ];
 
         $data = json_encode($dataArray);
@@ -77,16 +75,16 @@ class VerificationController extends Controller
     {
         $issuer = $request->input('issuer');
         $creds  = $request->input('creds');
-        $user   = $request->input('user');
+        $code   = $request->input('code');
         
-        file_put_contents('/tmp/' . trim($user), $issuer . ':' . $creds);
+        file_put_contents('/tmp/' . trim($code), $issuer . ':' . $creds);
 
         return response()->json([]);
     }
 
     public function checker(Request $request): JsonResponse
     {
-        $file = $request->input('user') ? '/tmp/' . trim($request->input('user')) : "";
+        $file = $request->input('code') ? '/tmp/' . trim($request->input('code')) : "";
 
         if (empty($file) || !file_exists($file)) {
             return response()->json(['ready' => false, 'result' => 'nofile']);
